@@ -27,10 +27,12 @@ import kotlin.math.abs
 
 private const val baseUrl = "https://api.spotify.com/v1/me/player"
 
-// The spotify api gives me fucking brain damage i swear to god
-// You can either specify album or playlist uris as "context_uri" String or track uris as "uris" array
 @Suppress("Unused")
-class SongBody(val uris: List<String>, val position_ms: Int = 0)
+class SongBody(val uris: List<String>, position_ms: Int = 0) {
+    // This ensures that even if a negative value is passed to the constructor,
+    // the actual property used in the JSON request is at least 0.
+    val position_ms = position_ms.coerceAtLeast(0)
+}
 
 object SpotifyApi {
     val client: SpotifyApiClient by lazy {
@@ -116,7 +118,8 @@ object SpotifyApi {
     }
 
     fun playSong(id: String, position_ms: Int) {
-        request("play", "PUT", SongBody(listOf("spotify:track:$id"), position_ms))
+        // Double safety check: coerce the value here before sending the body
+        request("play", "PUT", SongBody(listOf("spotify:track:$id"), position_ms.coerceAtLeast(0)))
     }
 
     fun pause() {
@@ -128,11 +131,14 @@ object SpotifyApi {
     }
 
     fun seek(position_ms: Int) {
+        // Clamp the position to a minimum of 0
+        val safePosition = position_ms.coerceAtLeast(0)
+
         getPlayerInfo {
             if (!it.is_playing)
-                playSong(it.item.id, position_ms)
-            else if (abs(it.progress_ms - position_ms) > 5000)
-                request("seek?position_ms=$position_ms")
+                playSong(it.item.id, safePosition)
+            else if (abs(it.progress_ms - safePosition) > 5000)
+                request("seek?position_ms=$safePosition")
         }
     }
 }
